@@ -15,14 +15,19 @@ import com.yangjie.bean.NotifyAuthBean;
 import com.yangjie.bean.NotifyMsgBean;
 import com.yangjie.bean.ReplyBean;
 import com.yangjie.bean.ReplyTextBean;
-import com.yangjie.controller.NotifyController;
 import com.yangjie.util.JsonUtil;
 import com.yangjie.util.XmlUtil;
 
+/**
+ * 微信公众号消息
+ * https://mp.weixin.qq.com/wiki?t=resource/res_main&id=mp1445241432
+ * @author YangJie 
+ * @createTime 2017年11月29日 下午3:29:32
+ */
 @Service
 public class NotifyService {
 	
-	private Logger logger = LoggerFactory.getLogger(NotifyController.class);
+	private Logger logger = LoggerFactory.getLogger(NotifyService.class);
 	
 	@Value("${wechat.token}")
 	private String token;
@@ -34,6 +39,7 @@ public class NotifyService {
 	 * 1）将token、timestamp、nonce三个参数进行字典序排序
 	 * 2）将三个参数字符串拼接成一个字符串进行sha1加密
 	 * 3）开发者获得加密后的字符串可与signature对比，标识该请求来源于微信
+	 * https://mp.weixin.qq.com/wiki?t=resource/res_main&id=mp1421135319
 	 * @param signature
 	 * @param timestamp
 	 * @param nonce
@@ -58,7 +64,7 @@ public class NotifyService {
 	public String dispose(String msg) {
 		try {
 			NotifyMsgBean msgBean = XmlUtil.toObject(msg, NotifyMsgBean.class);
-			logger.info("解析消息内容：{}", JsonUtil.toJson(msgBean));
+			logger.info("解析消息：{}", JsonUtil.toJson(msgBean));
 			switch (msgBean.getMsgType()) {
 			case event: // 事件消息
 				return disposeEvent(msgBean); // 处理事件消息
@@ -88,9 +94,8 @@ public class NotifyService {
 				return packTextReply(msgBean, "哒哒哒");
 			}
 		default:
-			break;
+			return packTextReply(msgBean, "事件消息木处理");
 		}
-		return packTextReply(msgBean, "事件消息木处理");
 	}
 	
 	/**
@@ -127,30 +132,9 @@ public class NotifyService {
 		replyBean.setToUserName(msgBean.getFromUserName());
 		replyBean.setFromUserName(msgBean.getToUserName());
 		replyBean.setCreateTime(System.currentTimeMillis());
-		logger.info("回复消息内容：{}", JsonUtil.toJson(replyBean));
-		return mapToXml(replyBean);
-	}
-	
-	
-	
-	/**
-	 * 获取xml格式参数字符串
-	 * @param paramMap
-	 * @return
-	 */
-	private String mapToXml(ReplyBean replyBean) {
+		logger.info("回复消息：{}", JsonUtil.toJson(replyBean));
 		return XmlUtil.toXml(replyBean);
-		
-		
-//		StringBuilder xmlBuilder = new StringBuilder("<xml>");
-//		for (String key : paramMap.keySet()) {
-//			if (key != null && paramMap.get(key)!=null && !paramMap.get(key).isEmpty()) {
-//				xmlBuilder.append("<").append(key).append(">").append(paramMap.get(key))
-//					.append("</").append(key).append(">");
-//			}
-//		}
-//		xmlBuilder.append("</xml>");
-//		return xmlBuilder.toString();
 	}
-
+	
+	
 }

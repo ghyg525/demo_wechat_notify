@@ -35,8 +35,10 @@ public class NotifyController {
 		logger.info("收到验证消息: {}", JsonUtil.toJson(authBean));
 		if (Objects.nonNull(authBean.getSignature()) && Objects.nonNull(authBean.getTimestamp()) 
 				&& Objects.nonNull(authBean.getNonce()) && notifyService.check(authBean)) {
+			logger.info("验证成功");
 			return authBean.getEchostr(); // 验证通过原样返回echostr
 		}
+		logger.info("验证失败");
 		return null;
 	}
 	
@@ -48,7 +50,9 @@ public class NotifyController {
 	@PostMapping
 	public String notify(@RequestBody String msg){
 		logger.info("收到通知消息: {}", msg);
-		return notifyService.dispose(msg);
+		String result = notifyService.dispose(msg);
+		logger.info("回复消息内容: {}", result);
+		return result;
 	}
 	
 }

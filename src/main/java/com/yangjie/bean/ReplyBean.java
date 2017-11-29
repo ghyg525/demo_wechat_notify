@@ -11,26 +11,26 @@ public class ReplyBean {
 
 	/** 开发者微信号 */
 	@JacksonXmlProperty(localName="ToUserName")
-	private String ToUserName;
+	private String toUserName;
 	/** 发送方帐号（一个OpenID） */
 	@JacksonXmlProperty(localName="FromUserName")
-	private String FromUserName;
+	private String fromUserName;
 	/** 消息创建时间 （整型） */
 	@JacksonXmlProperty(localName="CreateTime")
 	private long createTime;
 	
 	
 	public String getToUserName() {
-		return ToUserName;
+		return toUserName;
 	}
 	public void setToUserName(String toUserName) {
-		ToUserName = toUserName;
+		this.toUserName = toUserName;
 	}
 	public String getFromUserName() {
-		return FromUserName;
+		return fromUserName;
 	}
 	public void setFromUserName(String fromUserName) {
-		FromUserName = fromUserName;
+		this.fromUserName = fromUserName;
 	}
 	public long getCreateTime() {
 		return createTime;
