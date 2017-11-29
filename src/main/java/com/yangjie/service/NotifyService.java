@@ -2,9 +2,7 @@ package com.yangjie.service;
 
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.slf4j.Logger;
@@ -12,7 +10,13 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import com.yangjie.bean.MsgTypeEnum;
+import com.yangjie.bean.NotifyAuthBean;
+import com.yangjie.bean.NotifyMsgBean;
+import com.yangjie.bean.ReplyBean;
+import com.yangjie.bean.ReplyTextBean;
 import com.yangjie.controller.NotifyController;
+import com.yangjie.util.JsonUtil;
 import com.yangjie.util.XmlUtil;
 
 @Service
@@ -35,14 +39,14 @@ public class NotifyService {
 	 * @param nonce
 	 * @return
 	 */
-	public boolean check(String signature, String timestamp, String nonce) {
-		List<String> list = Arrays.asList(token, timestamp, nonce);
+	public boolean check(NotifyAuthBean authBean) {
+		List<String> list = Arrays.asList(token, authBean.getTimestamp(), authBean.getNonce());
 		Collections.sort(list); // 排序
 		String str = "";
 		for(String s : list) {
 			str += s; // 连接字符串
 		}
-		return signature.equals(DigestUtils.sha1Hex(str));
+		return authBean.getSignature().equals(DigestUtils.sha1Hex(str));
 	}
 	
 	
@@ -52,16 +56,16 @@ public class NotifyService {
 	 * @return
 	 */
 	public String dispose(String msg) {
-		try { // 此处暂时用map进行参数解析, 后面有时间转成bean
-			Map<String, String> msgMap = XmlUtil.toObject(msg, HashMap.class, Map.class, String.class, String.class);
-			logger.info("收到推送消息：{}", msgMap);
-			String msgType = msgMap.get("MsgType");
-			if ("event".equals(msgType)) {
-				return disposeEvent(msgMap); // 处理事件消息
-			}else if ("text".equals(msgType)) {
-				return disposeText(msgMap); // 处理文本消息
-			}else {
-				return packTextReply(msgMap, "木有处理");
+		try {
+			NotifyMsgBean msgBean = XmlUtil.toObject(msg, NotifyMsgBean.class);
+			logger.info("解析消息内容：{}", JsonUtil.toJson(msgBean));
+			switch (msgBean.getMsgType()) {
+			case event: // 事件消息
+				return disposeEvent(msgBean); // 处理事件消息
+			case text: // 文本消息
+				return disposeText(msgBean); // 处理文本消息
+			default:
+				return packTextReply(msgBean, "木有处理");
 			}
 		} catch (Exception e) {
 			logger.error("处理出现异常: ", e);
@@ -74,19 +78,19 @@ public class NotifyService {
 	 * @param msgMap
 	 * @return
 	 */
-	private String disposeEvent(Map<String, String> msgMap) {
-		if ("subscribe".equals(msgMap.get("Event"))) { // 关注事件
-			return packTextReply(msgMap, "恭喜你找到组织了!");
-		}
-		if ("CLICK".equals(msgMap.get("Event"))) { // 自定义菜单事件
-			if ("点击".equals(msgMap.get("EventKey"))) {
-				return packTextReply(msgMap, "哒哒哒");
+	private String disposeEvent(NotifyMsgBean msgBean) {
+		switch (msgBean.getEvent()) {
+		case subscribe: // 关注事件
+			packTextReply(msgBean, "恭喜你找到组织了!");
+		case CLICK: // 自定义菜单事件
+			// 此处的key是创建菜单时设置的
+			if ("key".equals(msgBean.getEventKey())) {
+				return packTextReply(msgBean, "哒哒哒");
 			}
-			if ("图片".equals(msgMap.get("EventKey"))) {
-				return packImageReply(msgMap, "");
-			}
+		default:
+			break;
 		}
-		return packTextReply(msgMap, "事件消息木处理");
+		return packTextReply(msgBean, "事件消息木处理");
 	}
 	
 	/**
@@ -94,9 +98,9 @@ public class NotifyService {
 	 * @param msgMap
 	 * @return
 	 */
-	private String disposeText(Map<String, String> msgMap) {
+	private String disposeText(NotifyMsgBean msgBean) {
 		String content = "文本消息木有处理";
-		return packTextReply(msgMap, content);
+		return packTextReply(msgBean, content);
 	}
 
 	/**
@@ -105,23 +109,11 @@ public class NotifyService {
 	 * @param content
 	 * @return
 	 */
-	private String packTextReply(Map<String, String> msgMap, String content) {
-		Map<String, String> replyMap = new HashMap<String, String>();
-		replyMap.put("MsgType", "text"); // 消息类型
-		replyMap.put("Content", content); // 消息内容
-		return packReply(msgMap, replyMap);
-	}
-	
-	/**
-	 * 封装图片回复内容
-	 * @param msgMap
-	 * @return
-	 */
-	private String packImageReply(Map<String, String> msgMap, String imageId) {
-		Map<String, String> replyMap = new HashMap<String, String>();
-		replyMap.put("MsgType", "image"); // 消息类型
-		replyMap.put("Image", "<MediaId><![CDATA["+imageId+"]]></MediaId>"); // 图片id，图片需要通过接口上传
-		return packReply(msgMap, replyMap);
+	private String packTextReply(NotifyMsgBean msgBean, String content) {
+		ReplyTextBean replyTextBean = new ReplyTextBean();
+		replyTextBean.setMsgType(MsgTypeEnum.text);
+		replyTextBean.setContent(content);
+		return packReply(msgBean, replyTextBean);
 	}
 	
 	/**
@@ -131,12 +123,12 @@ public class NotifyService {
 	 * @param replyMap
 	 * @return 
 	 */
-	private String packReply(Map<String, String> msgMap, Map<String, String> replyMap) {
-		replyMap.put("ToUserName", msgMap.get("FromUserName"));
-		replyMap.put("FromUserName", msgMap.get("ToUserName"));
-		replyMap.put("CreateTime", String.valueOf(System.currentTimeMillis()));
-		logger.info("回复消息内容：{}", replyMap);
-		return mapToXml(replyMap);
+	private String packReply(NotifyMsgBean msgBean, ReplyBean replyBean) {
+		replyBean.setToUserName(msgBean.getFromUserName());
+		replyBean.setFromUserName(msgBean.getToUserName());
+		replyBean.setCreateTime(System.currentTimeMillis());
+		logger.info("回复消息内容：{}", JsonUtil.toJson(replyBean));
+		return mapToXml(replyBean);
 	}
 	
 	
@@ -146,16 +138,19 @@ public class NotifyService {
 	 * @param paramMap
 	 * @return
 	 */
-	private String mapToXml(Map<String, String> paramMap) {
-		StringBuilder xmlBuilder = new StringBuilder("<xml>");
-		for (String key : paramMap.keySet()) {
-			if (key != null && paramMap.get(key)!=null && !paramMap.get(key).isEmpty()) {
-				xmlBuilder.append("<").append(key).append(">").append(paramMap.get(key))
-					.append("</").append(key).append(">");
-			}
-		}
-		xmlBuilder.append("</xml>");
-		return xmlBuilder.toString();
+	private String mapToXml(ReplyBean replyBean) {
+		return XmlUtil.toXml(replyBean);
+		
+		
+//		StringBuilder xmlBuilder = new StringBuilder("<xml>");
+//		for (String key : paramMap.keySet()) {
+//			if (key != null && paramMap.get(key)!=null && !paramMap.get(key).isEmpty()) {
+//				xmlBuilder.append("<").append(key).append(">").append(paramMap.get(key))
+//					.append("</").append(key).append(">");
+//			}
+//		}
+//		xmlBuilder.append("</xml>");
+//		return xmlBuilder.toString();
 	}
 
 }

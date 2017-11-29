@@ -1,5 +1,9 @@
 package com.yangjie.controller;
 
+import java.util.Objects;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -7,11 +11,15 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.yangjie.bean.NotifyAuthBean;
 import com.yangjie.service.NotifyService;
+import com.yangjie.util.JsonUtil;
 
 @RestController
 @RequestMapping("/notify")
 public class NotifyController {
+
+	private Logger logger = LoggerFactory.getLogger(NotifyController.class);
 	
 	@Autowired
 	private NotifyService notifyService;  
@@ -19,16 +27,15 @@ public class NotifyController {
 	
 	/**
 	 * 初始验证
-	 * @param signature 微信加密签名，signature结合了开发者填写的token参数和请求中的timestamp参数、nonce参数。
-	 * @param timestamp 时间戳
-	 * @param nonce 随机数
-	 * @param echostr 随机字符串
+	 * @param authBean 
 	 * @return
 	 */
 	@GetMapping
-	public String notify(String signature, String timestamp, String nonce, String echostr){
-		if (signature!=null && timestamp!=null && nonce!=null && notifyService.check(signature, timestamp, nonce)) {
-			return echostr; // 验证通过原样返回echostr
+	public String notify(NotifyAuthBean authBean){
+		logger.info("收到验证消息: {}", JsonUtil.toJson(authBean));
+		if (Objects.nonNull(authBean.getSignature()) && Objects.nonNull(authBean.getTimestamp()) 
+				&& Objects.nonNull(authBean.getNonce()) && notifyService.check(authBean)) {
+			return authBean.getEchostr(); // 验证通过原样返回echostr
 		}
 		return null;
 	}
@@ -40,6 +47,7 @@ public class NotifyController {
 	 */
 	@PostMapping
 	public String notify(@RequestBody String msg){
+		logger.info("收到通知消息: {}", msg);
 		return notifyService.dispose(msg);
 	}
 	
